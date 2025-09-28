@@ -2,56 +2,161 @@
 <html lang="vi">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Recap 2025 - Abc's Noob</title>
   <style>
-    body { font-family: Arial, sans-serif; margin: 40px; background: #fafafa; }
-    .content { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); min-height: 150px; }
-    h1 { color: #d33; }
-
-    /* Spinner */
-    .spinner {
-      border: 6px solid #f3f3f3;
-      border-top: 6px solid #d33;
-      border-radius: 50%;
-      width: 40px;
-      height: 40px;
-      animation: spin 1s linear infinite;
-      margin: 40px auto;
+    body {
+      font-family: Comfortaa, Arial, sans-serif;
+      background: #f5f5f5;
+      margin: 0;
+      padding: 20px;
     }
-
-    @keyframes spin {
-      0% { transform: rotate(0deg); }
-      100% { transform: rotate(360deg); }
+    .card {
+      background: white;
+      border-radius: 15px;
+      padding: 20px;
+      margin: 20px auto;
+      max-width: 800px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+    }
+    .actions {
+      margin-top: 10px;
+    }
+    .actions button {
+      margin-right: 10px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    .actions button:hover {
+      opacity: 0.9;
+    }
+    .comments {
+      margin-top: 15px;
+      padding-top: 10px;
+      border-top: 1px solid #ddd;
+    }
+    .comments input {
+      width: 70%;
+      padding: 6px;
+      margin-top: 8px;
+    }
+    .comments button {
+      padding: 6px 10px;
+      margin-left: 6px;
+    }
+    /* Spinner khi đang load */
+    .spinner {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      margin: 40px;
+    }
+    .spinner div {
+      width: 12px;
+      height: 12px;
+      margin: 4px;
+      border-radius: 50%;
+      background: #333;
+      animation: bounce 0.6s infinite alternate;
+    }
+    .spinner div:nth-child(2) {
+      animation-delay: 0.2s;
+    }
+    .spinner div:nth-child(3) {
+      animation-delay: 0.4s;
+    }
+    @keyframes bounce {
+      to {
+        opacity: 0.3;
+        transform: translateY(-8px);
+      }
     }
   </style>
 </head>
 <body>
-  <div class="content" id="main-content">
-    <div class="spinner"></div>
-    <p style="text-align:center;">Đang tải nội dung...</p>
+  <h1>🔥 Recap 2025 - Abc's Noob</h1>
+  <div id="content">
+    <div class="spinner"><div></div><div></div><div></div></div>
   </div>
 
-  <script>
-    const params = new URLSearchParams(window.location.search);
-    const contentKey = params.get("content");
-    const container = document.getElementById("main-content");
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js"></script>
 
-    fetch("content.json")
-      .then(res => res.json())
-      .then(data => {
-        if (data[contentKey]) {
-          container.innerHTML = `
-            <h1>${data[contentKey].title}</h1>
-            ${data[contentKey].body}
-          `;
-        } else {
-          container.innerHTML = "<h1>404 - Nội dung không tồn tại</h1>";
-        }
-      })
-      .catch(err => {
-        container.innerHTML = "<h1>Lỗi khi tải dữ liệu</h1>";
-        console.error(err);
+  <script>
+    // ⚠️ THAY ĐOẠN CONFIG NÀY BẰNG FIREBASE CỦA BẠN
+  const firebaseConfig = {
+    apiKey: "AIzaSyAXw6BY4U6VLlwoaKnlrzCzOHKaww6KZN8",
+    authDomain: "abcsnoobrecap2025.firebaseapp.com",
+    projectId: "abcsnoobrecap2025",
+    storageBucket: "abcsnoobrecap2025.firebasestorage.app",
+    messagingSenderId: "289987914307",
+    appId: "1:289987914307:web:aef1e2497d901be37442f6",
+    measurementId: "G-9H1PVE7SHZ"
+  };
+
+    // Khởi tạo Firebase
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    async function loadContent() {
+      const container = document.getElementById("content");
+      container.innerHTML = '<div class="spinner"><div></div><div></div><div></div></div>';
+
+      const snapshot = await db.collection("dramas").get();
+      container.innerHTML = "";
+
+      snapshot.forEach(doc => {
+        const item = doc.data();
+        const div = document.createElement("div");
+        div.className = "card";
+        div.innerHTML = `
+          <h2>${item.title}</h2>
+          ${item.body}
+          <div class="actions">
+            <button onclick="like('${doc.id}')">👍 ${item.likes || 0}</button>
+            <button onclick="dislike('${doc.id}')">👎 ${item.dislikes || 0}</button>
+          </div>
+          <div class="comments" id="comments-${doc.id}">
+            <h4>Bình luận</h4>
+            ${item.comments ? item.comments.map(c => `<p><b>${c.user}:</b> ${c.text}</p>`).join("") : ""}
+            <input type="text" id="input-${doc.id}" placeholder="Viết bình luận...">
+            <button onclick="addComment('${doc.id}')">Gửi</button>
+          </div>
+        `;
+        container.appendChild(div);
       });
+    }
+
+    async function like(id) {
+      const ref = db.collection("dramas").doc(id);
+      await ref.update({ likes: firebase.firestore.FieldValue.increment(1) });
+      loadContent();
+    }
+
+    async function dislike(id) {
+      const ref = db.collection("dramas").doc(id);
+      await ref.update({ dislikes: firebase.firestore.FieldValue.increment(1) });
+      loadContent();
+    }
+
+    async function addComment(id) {
+      const input = document.getElementById("input-" + id);
+      const text = input.value.trim();
+      if (text !== "") {
+        const ref = db.collection("dramas").doc(id);
+        await ref.update({
+          comments: firebase.firestore.FieldValue.arrayUnion({ user: "Khách", text })
+        });
+        input.value = "";
+        loadContent();
+      }
+    }
+
+    loadContent();
   </script>
 </body>
 </html>
