@@ -5,39 +5,53 @@
   <title>Recap 2025 - Abc's Noob</title>
   <style>
     body { font-family: Arial, sans-serif; margin: 40px; background: #fafafa; }
-    .content { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); }
+    .content { background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 6px rgba(0,0,0,0.15); min-height: 150px; }
     h1 { color: #d33; }
+
+    /* Spinner */
+    .spinner {
+      border: 6px solid #f3f3f3;
+      border-top: 6px solid #d33;
+      border-radius: 50%;
+      width: 40px;
+      height: 40px;
+      animation: spin 1s linear infinite;
+      margin: 40px auto;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
   </style>
 </head>
 <body>
   <div class="content" id="main-content">
-    <h1>Đang tải...</h1>
+    <div class="spinner"></div>
+    <p style="text-align:center;">Đang tải nội dung...</p>
   </div>
 
   <script>
-    // Lấy query ?content=...
     const params = new URLSearchParams(window.location.search);
-    const content = params.get("content");
+    const contentKey = params.get("content");
     const container = document.getElementById("main-content");
 
-    // Nội dung mẫu
-    const database = {
-      robloxdramakids: `
-        <h1>Drama Roblox Trẻ Em 2025</h1>
-        <p>Trong năm 2025, cộng đồng Roblox đã chấn động bởi một loạt drama xoay quanh các kênh trẻ em...</p>
-      `,
-      youtube2025: `
-        <h1>Drama YouTube 2025</h1>
-        <p>Năm 2025 đánh dấu nhiều vụ việc gây bức xúc: demonetization vô lý, Wolfoo vs eOne, Andrew bị phớt lờ...</p>
-      `
-    };
-
-    // Hiển thị
-    if (database[content]) {
-      container.innerHTML = database[content];
-    } else {
-      container.innerHTML = `<h1>404 - Nội dung không tồn tại</h1>`;
-    }
+    fetch("content.json")
+      .then(res => res.json())
+      .then(data => {
+        if (data[contentKey]) {
+          container.innerHTML = `
+            <h1>${data[contentKey].title}</h1>
+            ${data[contentKey].body}
+          `;
+        } else {
+          container.innerHTML = "<h1>404 - Nội dung không tồn tại</h1>";
+        }
+      })
+      .catch(err => {
+        container.innerHTML = "<h1>Lỗi khi tải dữ liệu</h1>";
+        console.error(err);
+      });
   </script>
 </body>
 </html>
