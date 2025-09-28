@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thêm Drama vào Firestore</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 20px; background: #f5f5f5; }
+    .form-group { margin-bottom: 15px; }
+    label { display: block; margin-bottom: 5px; font-weight: bold; }
+    input[type=text], textarea { width: 100%; padding: 8px; border-radius: 6px; border: 1px solid #ccc; }
+    button { padding: 8px 16px; border: none; border-radius: 6px; background: #007bff; color: white; cursor: pointer; }
+    button:hover { background: #0056b3; }
+  </style>
+</head>
+<body>
+  <h1>Thêm Drama vào Firestore</h1>
+  <div>
+    <div class="form-group">
+      <label>Title</label>
+      <input type="text" id="title" placeholder="Nhập tiêu đề">
+    </div>
+    <div class="form-group">
+      <label>Body</label>
+      <textarea id="body" rows="6" placeholder="Nhập nội dung"></textarea>
+    </div>
+    <div class="form-group">
+      <label>User Comment</label>
+      <input type="text" id="commentUser" placeholder="Người bình luận">
+      <input type="text" id="commentText" placeholder="Nội dung bình luận">
+    </div>
+    <button onclick="addDrama()">Thêm Drama</button>
+  </div>
+
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
+  <script>
+    // Thay bằng config Firebase của bạn 
+    const firebaseConfig = {
+    apiKey: "AIzaSyAXw6BY4U6VLlwoaKnlrzCzOHKaww6KZN8",
+    authDomain: "abcsnoobrecap2025.firebaseapp.com",
+    projectId: "abcsnoobrecap2025",
+    storageBucket: "abcsnoobrecap2025.firebasestorage.app",
+    messagingSenderId: "289987914307",
+    appId: "1:289987914307:web:aef1e2497d901be37442f6",
+    measurementId: "G-9H1PVE7SHZ"
+  };
+
+
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
+    async function addDrama() {
+      const title = document.getElementById('title').value.trim();
+      const body = document.getElementById('body').value.trim();
+      const commentUser = document.getElementById('commentUser').value.trim();
+      const commentText = document.getElementById('commentText').value.trim();
+
+      if (!title || !body) {
+        alert("Vui lòng nhập cả title và body!");
+        return;
+      }
+
+      const drama = {
+        title,
+        body,
+        likes: 0,
+        dislikes: 0,
+        comments: commentUser && commentText ? [{ user: commentUser, text: commentText }] : [],
+        createdAt: new Date()
+      };
+
+      try {
+        const docRef = await db.collection("dramas").add(drama);
+        alert("Đã thêm drama với ID: " + docRef.id);
+        // Reset form
+        document.getElementById('title').value = "";
+        document.getElementById('body').value = "";
+        document.getElementById('commentUser').value = "";
+        document.getElementById('commentText').value = "";
+      } catch (e) {
+        console.error("Lỗi khi thêm drama: ", e);
+        alert("Có lỗi khi thêm drama. Kiểm tra console.");
+      }
+    }
+  </script>
+</body>
+</html>
