@@ -30,9 +30,6 @@
       cursor: pointer;
       font-size: 14px;
     }
-    .actions button:hover {
-      opacity: 0.9;
-    }
     .comments {
       margin-top: 15px;
       padding-top: 10px;
@@ -47,7 +44,6 @@
       padding: 6px 10px;
       margin-left: 6px;
     }
-    /* Spinner khi đang load */
     .spinner {
       display: flex;
       justify-content: center;
@@ -81,6 +77,8 @@
   <div id="content">
     <div class="spinner"><div></div><div></div><div></div></div>
   </div>
+  <div id="loadMoreTrigger" style="height:50px;"></div>
+
 
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
@@ -98,16 +96,34 @@
     measurementId: "G-9H1PVE7SHZ"
   };
 
-    // Khởi tạo Firebase
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
-    async function loadContent() {
-      const container = document.getElementById("content");
-      container.innerHTML = '<div class="spinner"><div></div><div></div><div></div></div>';
+    const contentDiv = document.getElementById("content");
+    let lastVisible = null;
+    let loading = false;
+    const batchSize = 5;
 
-      const snapshot = await db.collection("dramas").get();
-      container.innerHTML = "";
+    async function loadMore() {
+      if (loading) return;
+      loading = true;
+
+      let query = db.collection("dramas")
+        .orderBy("title")
+        .limit(batchSize);
+
+      if (lastVisible) {
+        query = query.startAfter(lastVisible);
+      }
+
+      const snapshot = await query.get();
+
+      if (snapshot.empty) {
+        document.getElementById("loadMoreTrigger").innerHTML = "<p style='text-align:center;color:#666'>Hết drama rồi 😅</p>";
+        return;
+      }
+
+      lastVisible = snapshot.docs[snapshot.docs.length - 1];
 
       snapshot.forEach(doc => {
         const item = doc.data();
@@ -127,20 +143,22 @@
             <button onclick="addComment('${doc.id}')">Gửi</button>
           </div>
         `;
-        container.appendChild(div);
+        contentDiv.appendChild(div);
       });
+
+      loading = false;
     }
 
     async function like(id) {
       const ref = db.collection("dramas").doc(id);
       await ref.update({ likes: firebase.firestore.FieldValue.increment(1) });
-      loadContent();
+      reload();
     }
 
     async function dislike(id) {
       const ref = db.collection("dramas").doc(id);
       await ref.update({ dislikes: firebase.firestore.FieldValue.increment(1) });
-      loadContent();
+      reload();
     }
 
     async function addComment(id) {
@@ -152,11 +170,26 @@
           comments: firebase.firestore.FieldValue.arrayUnion({ user: "Khách", text })
         });
         input.value = "";
-        loadContent();
+        reload();
       }
     }
 
-    loadContent();
+    function reload() {
+      contentDiv.innerHTML = "";
+      lastVisible = null;
+      loadMore();
+    }
+
+    // Lazy load trigger
+    const observer = new IntersectionObserver(entries => {
+      if (entries[0].isIntersecting) {
+        loadMore();
+      }
+    });
+    observer.observe(document.getElementById("loadMoreTrigger"));
+
+    // Load batch đầu tiên
+    loadMore();
   </script>
 </body>
 </html>
