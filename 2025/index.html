@@ -80,12 +80,12 @@
   <div id="loadMoreTrigger" style="height:50px;"></div>
 
 
-  <!-- Firebase SDK -->
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.0/firebase-firestore.js"></script>
+<!-- Firebase SDK -->
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
-  <script>
-    // ⚠️ THAY ĐOẠN CONFIG NÀY BẰNG FIREBASE CỦA BẠN
+<script>
+  // ⚠️ THAY ĐOẠN CONFIG NÀY BẰNG FIREBASE CỦA BẠN
   const firebaseConfig = {
     apiKey: "AIzaSyAXw6BY4U6VLlwoaKnlrzCzOHKaww6KZN8",
     authDomain: "abcsnoobrecap2025.firebaseapp.com",
@@ -96,118 +96,113 @@
     measurementId: "G-9H1PVE7SHZ"
   };
 
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.firestore();
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.firestore();
 
-    const contentDiv = document.getElementById("content");
-    let lastVisible = null;
-    let loading = false;
-    const batchSize = 5;
+  const contentDiv = document.getElementById("content");
+  let lastVisible = null;
+  let loading = false;
+  const batchSize = 5;
 
-    async function loadMore() {
-      if (loading) return;
-      loading = true;
+  async function loadMore() {
+    if (loading) return;
+    loading = true;
 
-      let query = db.collection("dramas")
-        .orderBy("title")
-        .limit(batchSize);
+    let query = db.collection("dramas")
+      .orderBy("createdAt", "desc")
+      .limit(batchSize);
 
-      if (lastVisible) {
-        query = query.startAfter(lastVisible);
+    if (lastVisible) {
+      query = query.startAfter(lastVisible);
+    }
+
+    const snapshot = await query.get();
+
+    if (snapshot.empty) {
+      document.getElementById("loadMoreTrigger").innerHTML =
+        "<p style='text-align:center;color:#666'>Hết drama rồi 😅</p>";
+      return;
+    }
+
+    lastVisible = snapshot.docs[snapshot.docs.length - 1];
+
+    snapshot.forEach(doc => {
+      const item = doc.data();
+
+      // format createdAt
+      let dateStr = "Không rõ";
+      if (item.createdAt) {
+        if (typeof item.createdAt.toDate === "function") {
+          dateStr = item.createdAt.toDate().toLocaleString("vi-VN");
+        } else if (typeof item.createdAt === "number") {
+          dateStr = new Date(item.createdAt).toLocaleString("vi-VN");
+        }
       }
 
-      const snapshot = await query.get();
+      const div = document.createElement("div");
+      div.className = "card";
+      div.innerHTML = `
+        <h2>${item.title}</h2>
+        ${item.body}
+        <div class="date">🕒 ${dateStr}</div>
+        <div class="actions">
+          <button onclick="like('${doc.id}')">👍 ${item.likes || 0}</button>
+          <button onclick="dislike('${doc.id}')">👎 ${item.dislikes || 0}</button>
+        </div>
+        <div class="comments" id="comments-${doc.id}">
+          <h4>Bình luận</h4>
+          ${item.comments ? item.comments.map(c => `<p><b>${c.user}:</b> ${c.text}</p>`).join("") : ""}
+          <input type="text" id="input-${doc.id}" placeholder="Viết bình luận...">
+          <button onclick="addComment('${doc.id}')">Gửi</button>
+        </div>
+      `;
+      contentDiv.appendChild(div);
+    });
 
-      if (snapshot.empty) {
-        document.getElementById("loadMoreTrigger").innerHTML = "<p style='text-align:center;color:#666'>Hết drama rồi 😅</p>";
-        return;
-      }
+    loading = false;
+  }
 
-      lastVisible = snapshot.docs[snapshot.docs.length - 1];
+  async function like(id) {
+    const ref = db.collection("dramas").doc(id);
+    await ref.update({ likes: firebase.firestore.FieldValue.increment(1) });
+    reload();
+  }
 
-snapshot.forEach(doc => {
-  const item = doc.data();
+  async function dislike(id) {
+    const ref = db.collection("dramas").doc(id);
+    await ref.update({ dislikes: firebase.firestore.FieldValue.increment(1) });
+    reload();
+  }
 
-  // format createdAt (có thể là number hoặc Firestore Timestamp)
-  let dateStr = "Không rõ";
-  if (item.createdAt) {
-    if (typeof item.createdAt.toDate === "function") {
-      // Firestore Timestamp object
-      dateStr = item.createdAt.toDate().toLocaleString("vi-VN");
-    } else if (typeof item.createdAt === "number") {
-      // epoch millis
-      dateStr = new Date(item.createdAt).toLocaleString("vi-VN");
+  async function addComment(id) {
+    const input = document.getElementById("input-" + id);
+    const text = input.value.trim();
+    if (text !== "") {
+      const ref = db.collection("dramas").doc(id);
+      await ref.update({
+        comments: firebase.firestore.FieldValue.arrayUnion({ user: "Khách", text })
+      });
+      input.value = "";
+      reload();
     }
   }
 
-  const div = document.createElement("div");
-  div.className = "card";
-  div.innerHTML = `
-    <h2>${item.title}</h2>
-    ${item.body}
-    <div class="date">🕒 ${dateStr}</div>
-    <div class="actions">
-      <button onclick="like('${doc.id}')">👍 ${item.likes || 0}</button>
-      <button onclick="dislike('${doc.id}')">👎 ${item.dislikes || 0}</button>
-    </div>
-    <div class="comments" id="comments-${doc.id}">
-      <h4>Bình luận</h4>
-      ${item.comments ? item.comments.map(c => `<p><b>${c.user}:</b> ${c.text}</p>`).join("") : ""}
-      <input type="text" id="input-${doc.id}" placeholder="Viết bình luận...">
-      <button onclick="addComment('${doc.id}')">Gửi</button>
-    </div>
-  `;
-  document.getElementById("content").appendChild(div);
-});
+  function reload() {
+    contentDiv.innerHTML = "";
+    lastVisible = null;
+    loadMore();
+  }
 
-        `;
-        contentDiv.appendChild(div);
-      });
-
-      loading = false;
-    }
-
-    async function like(id) {
-      const ref = db.collection("dramas").doc(id);
-      await ref.update({ likes: firebase.firestore.FieldValue.increment(1) });
-      reload();
-    }
-
-    async function dislike(id) {
-      const ref = db.collection("dramas").doc(id);
-      await ref.update({ dislikes: firebase.firestore.FieldValue.increment(1) });
-      reload();
-    }
-
-    async function addComment(id) {
-      const input = document.getElementById("input-" + id);
-      const text = input.value.trim();
-      if (text !== "") {
-        const ref = db.collection("dramas").doc(id);
-        await ref.update({
-          comments: firebase.firestore.FieldValue.arrayUnion({ user: "Khách", text })
-        });
-        input.value = "";
-        reload();
-      }
-    }
-
-    function reload() {
-      contentDiv.innerHTML = "";
-      lastVisible = null;
+  // Lazy load trigger
+  const observer = new IntersectionObserver(entries => {
+    if (entries[0].isIntersecting) {
       loadMore();
     }
+  });
+  observer.observe(document.getElementById("loadMoreTrigger"));
 
-    // Lazy load trigger
-    const observer = new IntersectionObserver(entries => {
-      if (entries[0].isIntersecting) {
-        loadMore();
-      }
-    });
-    observer.observe(document.getElementById("loadMoreTrigger"));
-
-    // Load batch đầu tiên
-    loadMore();
-  </script>
+  // Load batch đầu tiên
+  loadMore();
+</script>
 </body>
 </html>
