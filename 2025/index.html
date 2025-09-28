@@ -85,7 +85,7 @@
 <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
 
 <script>
-  // ⚠️ THAY ĐOẠN CONFIG NÀY BẰNG FIREBASE CỦA BẠN
+  // ⚠️ Config Firebase
   const firebaseConfig = {
     apiKey: "AIzaSyAXw6BY4U6VLlwoaKnlrzCzOHKaww6KZN8",
     authDomain: "abcsnoobrecap2025.firebaseapp.com",
@@ -98,82 +98,85 @@
 
   firebase.initializeApp(firebaseConfig);
   const db = firebase.firestore();
-
   const contentDiv = document.getElementById("content");
-  let lastVisible = null;
-  let loading = false;
-  const batchSize = 5;
 
-  async function loadMore() {
-    if (loading) return;
-    loading = true;
+  // 👉 Hàm format "x phút/giờ/ngày trước"
+  function timeAgo(date) {
+    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
 
-    let query = db.collection("dramas")
-      .orderBy("createdAt", "desc")
-      .limit(batchSize);
+    const intervals = [
+      { label: "năm", seconds: 31536000 },
+      { label: "tháng", seconds: 2592000 },
+      { label: "tuần", seconds: 604800 },
+      { label: "ngày", seconds: 86400 },
+      { label: "giờ", seconds: 3600 },
+      { label: "phút", seconds: 60 }
+    ];
 
-    if (lastVisible) {
-      query = query.startAfter(lastVisible);
+    for (const interval of intervals) {
+      const count = Math.floor(seconds / interval.seconds);
+      if (count >= 1) return `${count} ${interval.label} trước`;
     }
-
-    const snapshot = await query.get();
-
-    if (snapshot.empty) {
-      document.getElementById("loadMoreTrigger").innerHTML =
-        "<p style='text-align:center;color:#666'>Hết drama rồi 😅</p>";
-      return;
-    }
-
-    lastVisible = snapshot.docs[snapshot.docs.length - 1];
-
-    snapshot.forEach(doc => {
-      const item = doc.data();
-
-      // format createdAt
-      let dateStr = "Không rõ";
-      if (item.createdAt) {
-        if (typeof item.createdAt.toDate === "function") {
-          dateStr = item.createdAt.toDate().toLocaleString("vi-VN");
-        } else if (typeof item.createdAt === "number") {
-          dateStr = new Date(item.createdAt).toLocaleString("vi-VN");
-        }
-      }
-
-      const div = document.createElement("div");
-      div.className = "card";
-      div.innerHTML = `
-        <h2>${item.title}</h2>
-        ${item.body}
-        <div class="date">🕒 ${dateStr}</div>
-        <div class="actions">
-          <button onclick="like('${doc.id}')">👍 ${item.likes || 0}</button>
-          <button onclick="dislike('${doc.id}')">👎 ${item.dislikes || 0}</button>
-        </div>
-        <div class="comments" id="comments-${doc.id}">
-          <h4>Bình luận</h4>
-          ${item.comments ? item.comments.map(c => `<p><b>${c.user}:</b> ${c.text}</p>`).join("") : ""}
-          <input type="text" id="input-${doc.id}" placeholder="Viết bình luận...">
-          <button onclick="addComment('${doc.id}')">Gửi</button>
-        </div>
-      `;
-      contentDiv.appendChild(div);
-    });
-
-    loading = false;
+    return "Vừa xong";
   }
 
+  // 👉 Render 1 drama
+  function renderDrama(doc) {
+    const item = doc.data();
+
+    let dateStr = "Không rõ";
+    if (item.createdAt?.toDate) {
+      dateStr = timeAgo(item.createdAt.toDate());
+    }
+
+    const div = document.createElement("div");
+    div.className = "card";
+    div.id = "drama-" + doc.id;
+    div.innerHTML = `
+      <h2>${item.title}</h2>
+      ${item.body}
+      <div class="date">🕒 ${dateStr}</div>
+      <div class="actions">
+        <button onclick="like('${doc.id}')">👍 ${item.likes || 0}</button>
+        <button onclick="dislike('${doc.id}')">👎 ${item.dislikes || 0}</button>
+      </div>
+      <div class="comments" id="comments-${doc.id}">
+        <h4>Bình luận</h4>
+        ${item.comments ? item.comments.map(c => `<p><b>${c.user}:</b> ${c.text}</p>`).join("") : ""}
+        <input type="text" id="input-${doc.id}" placeholder="Viết bình luận...">
+        <button onclick="addComment('${doc.id}')">Gửi</button>
+      </div>
+    `;
+    return div;
+  }
+
+  // 👉 Realtime listener
+  db.collection("dramas")
+    .orderBy("createdAt", "desc")
+    .onSnapshot(snapshot => {
+      contentDiv.innerHTML = ""; // clear
+      if (snapshot.empty) {
+        contentDiv.innerHTML = "<p style='text-align:center;color:#666'>Chưa có drama nào 😅</p>";
+        return;
+      }
+      snapshot.forEach(doc => {
+        contentDiv.appendChild(renderDrama(doc));
+      });
+    });
+
+  // 👉 Like
   async function like(id) {
     const ref = db.collection("dramas").doc(id);
     await ref.update({ likes: firebase.firestore.FieldValue.increment(1) });
-    reload();
   }
 
+  // 👉 Dislike
   async function dislike(id) {
     const ref = db.collection("dramas").doc(id);
     await ref.update({ dislikes: firebase.firestore.FieldValue.increment(1) });
-    reload();
   }
 
+  // 👉 Comment
   async function addComment(id) {
     const input = document.getElementById("input-" + id);
     const text = input.value.trim();
@@ -183,26 +186,9 @@
         comments: firebase.firestore.FieldValue.arrayUnion({ user: "Khách", text })
       });
       input.value = "";
-      reload();
     }
   }
-
-  function reload() {
-    contentDiv.innerHTML = "";
-    lastVisible = null;
-    loadMore();
-  }
-
-  // Lazy load trigger
-  const observer = new IntersectionObserver(entries => {
-    if (entries[0].isIntersecting) {
-      loadMore();
-    }
-  });
-  observer.observe(document.getElementById("loadMoreTrigger"));
-
-  // Load batch đầu tiên
-  loadMore();
 </script>
+
 </body>
 </html>
